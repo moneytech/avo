@@ -20,6 +20,20 @@ type Label string
 
 func (l Label) node() {}
 
+// Comment represents a multi-line comment.
+type Comment struct {
+	Lines []string
+}
+
+func (c *Comment) node() {}
+
+// NewComment builds a Comment consisting of the provided lines.
+func NewComment(lines ...string) *Comment {
+	return &Comment{
+		Lines: lines,
+	}
+}
+
 // Instruction is a single instruction in a function.
 type Instruction struct {
 	Opcode   string
@@ -28,20 +42,29 @@ type Instruction struct {
 	Inputs  []operand.Op
 	Outputs []operand.Op
 
-	IsTerminal    bool
-	IsBranch      bool
-	IsConditional bool
+	IsTerminal       bool
+	IsBranch         bool
+	IsConditional    bool
+	CancellingInputs bool
+
+	// ISA is the list of required instruction set extensions.
+	ISA []string
 
 	// CFG.
 	Pred []*Instruction
 	Succ []*Instruction
 
 	// LiveIn/LiveOut are sets of live register IDs pre/post execution.
-	LiveIn  reg.Set
-	LiveOut reg.Set
+	LiveIn  reg.MaskSet
+	LiveOut reg.MaskSet
 }
 
 func (i *Instruction) node() {}
+
+// IsUnconditionalBranch reports whether i is an unconditional branch.
+func (i Instruction) IsUnconditionalBranch() bool {
+	return i.IsBranch && !i.IsConditional
+}
 
 // TargetLabel returns the label referenced by this instruction. Returns nil if
 // no label is referenced.
@@ -73,6 +96,9 @@ func (i Instruction) InputRegisters() []reg.Register {
 	var rs []reg.Register
 	for _, op := range i.Inputs {
 		rs = append(rs, operand.Registers(op)...)
+	}
+	if i.CancellingInputs && rs[0] == rs[1] {
+		rs = []reg.Register{}
 	}
 	for _, op := range i.Outputs {
 		if operand.IsMem(op) {
@@ -126,10 +152,17 @@ func (f *File) Functions() []*Function {
 	return fns
 }
 
+// Pragma represents a function compiler directive.
+type Pragma struct {
+	Directive string
+	Arguments []string
+}
+
 // Function represents an assembly function.
 type Function struct {
 	Name       string
 	Attributes attr.Attribute
+	Pragmas    []Pragma
 	Doc        []string
 	Signature  *gotypes.Signature
 	LocalSize  int
@@ -141,6 +174,9 @@ type Function struct {
 
 	// Register allocation.
 	Allocation reg.Allocation
+
+	// ISA is the list of required instruction set extensions.
+	ISA []string
 }
 
 func (f *Function) section() {}
@@ -151,6 +187,14 @@ func NewFunction(name string) *Function {
 		Name:      name,
 		Signature: gotypes.NewSignatureVoid(),
 	}
+}
+
+// AddPragma adds a pragma to this function.
+func (f *Function) AddPragma(directive string, args ...string) {
+	f.Pragmas = append(f.Pragmas, Pragma{
+		Directive: directive,
+		Arguments: args,
+	})
 }
 
 // SetSignature sets the function signature.
@@ -176,6 +220,11 @@ func (f *Function) AddLabel(l Label) {
 	f.AddNode(l)
 }
 
+// AddComment adds comment lines to f.
+func (f *Function) AddComment(lines ...string) {
+	f.AddNode(NewComment(lines...))
+}
+
 // AddNode appends a Node to f.
 func (f *Function) AddNode(n Node) {
 	f.Nodes = append(f.Nodes, n)
@@ -191,6 +240,18 @@ func (f *Function) Instructions() []*Instruction {
 		}
 	}
 	return is
+}
+
+// Labels returns just the list of label nodes.
+func (f *Function) Labels() []Label {
+	var lbls []Label
+	for _, n := range f.Nodes {
+		lbl, ok := n.(Label)
+		if ok {
+			lbls = append(lbls, lbl)
+		}
+	}
+	return lbls
 }
 
 // Stub returns the Go function declaration.

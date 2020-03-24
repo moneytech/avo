@@ -11,27 +11,23 @@ import (
 // label name to the following instruction.
 func LabelTarget(fn *ir.Function) error {
 	target := map[ir.Label]*ir.Instruction{}
-	for idx := 0; idx < len(fn.Nodes); idx++ {
-		// Is this a label?
-		lbl, ok := fn.Nodes[idx].(ir.Label)
-		if !ok {
-			continue
+	var pending []ir.Label
+	for _, node := range fn.Nodes {
+		switch n := node.(type) {
+		case ir.Label:
+			if _, found := target[n]; found {
+				return fmt.Errorf("duplicate label \"%s\"", n)
+			}
+			pending = append(pending, n)
+		case *ir.Instruction:
+			for _, label := range pending {
+				target[label] = n
+			}
+			pending = nil
 		}
-		// Check for a duplicate label.
-		if _, found := target[lbl]; found {
-			return fmt.Errorf("duplicate label \"%s\"", lbl)
-		}
-		// Advance to next node.
-		if idx == len(fn.Nodes)-1 {
-			return errors.New("function ends with label")
-		}
-		idx++
-		// Should be an instruction.
-		i, ok := fn.Nodes[idx].(*ir.Instruction)
-		if !ok {
-			return errors.New("instruction should follow a label")
-		}
-		target[lbl] = i
+	}
+	if len(pending) != 0 {
+		return errors.New("function ends with label")
 	}
 	fn.LabelTarget = target
 	return nil
@@ -58,7 +54,7 @@ func CFG(fn *ir.Function) error {
 			}
 			target, found := fn.LabelTarget[*lbl]
 			if !found {
-				return errors.New("unknown label")
+				return fmt.Errorf("unknown label %q", *lbl)
 			}
 			cur.Succ = append(cur.Succ, target)
 		}
@@ -66,7 +62,7 @@ func CFG(fn *ir.Function) error {
 		// Otherwise, could continue to the following instruction.
 		switch {
 		case cur.IsTerminal:
-		case cur.IsBranch && !cur.IsConditional:
+		case cur.IsUnconditionalBranch():
 		default:
 			cur.Succ = append(cur.Succ, nxt)
 		}

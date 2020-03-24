@@ -1,8 +1,9 @@
 <p align="center">
   <img src="logo.svg" width="40%" border="0" alt="avo" />
   <br />
-  <a href="https://travis-ci.org/mmcloughlin/avo"><img src="https://img.shields.io/travis/mmcloughlin/avo.svg?style=flat-square" alt="Build Status" /></a>
-  <a href="http://godoc.org/github.com/mmcloughlin/avo"><img src="http://img.shields.io/badge/godoc-reference-5272B4.svg?style=flat-square" alt="GoDoc" /></a>
+  <img src="https://img.shields.io/github/workflow/status/mmcloughlin/avo/ci/master.svg?style=flat-square" alt="Build Status" />
+  <a href="https://pkg.go.dev/github.com/mmcloughlin/avo"><img src="https://img.shields.io/badge/doc-reference-007d9b?logo=go&style=flat-square" alt="go.dev" /></a>
+  <a href="https://goreportcard.com/report/github.com/mmcloughlin/avo"><img src="https://goreportcard.com/badge/github.com/mmcloughlin/avo?style=flat-square" alt="Go Report Card" /></a>
 </p>
 
 <p align="center">Generate x86 Assembly with Go</p>
@@ -13,6 +14,8 @@
 * **Register allocation**: write functions with virtual registers and `avo` assigns physical registers for you
 * **Automatically load arguments and store return values**: ensure memory offsets are correct for complex structures
 * **Generation of stub files** to interface with your Go package
+
+For an introduction to `avo` watch the [dotGo 2019](https://2019.dotgo.eu/) talk [Better `x86` Assembly Generation with Go](https://www.youtube.com/watch?v=6Y5CZ7_tyA4) ([slides](https://speakerdeck.com/mmcloughlin/better-x86-assembly-generation-with-go)), or see the [Gophercon 2019 talk](https://www.youtube.com/watch?v=WaD8sNqroAw) ([slides](https://speakerdeck.com/mmcloughlin/better-x86-assembly-generation-with-go-gophercon-2019)) for a longer tutorial.
 
 _Note: APIs subject to change while `avo` is still in an experimental phase. You can use it to build [real things](examples) but we suggest you pin a version with your package manager of choice._
 
@@ -32,9 +35,7 @@ $ go get -u github.com/mmcloughlin/avo
 
 package main
 
-import (
-	. "github.com/mmcloughlin/avo/build"
-)
+import . "github.com/mmcloughlin/avo/build"
 
 func main() {
 	TEXT("Add", NOSPLIT, "func(x, y uint64) uint64")
@@ -65,10 +66,10 @@ After running `go generate` the [`add.s`](examples/add/add.s) file will contain 
 
 // func Add(x uint64, y uint64) uint64
 TEXT ·Add(SB), NOSPLIT, $0-24
-	MOVQ	x(FP), AX
-	MOVQ	y+8(FP), CX
-	ADDQ	AX, CX
-	MOVQ	CX, ret+16(FP)
+	MOVQ x+0(FP), AX
+	MOVQ y+8(FP), CX
+	ADDQ AX, CX
+	MOVQ CX, ret+16(FP)
 	RET
 ```
 
@@ -102,25 +103,25 @@ func main() {
 	ptr := Load(Param("xs").Base(), GP64())
 	n := Load(Param("xs").Len(), GP64())
 
-	// Initialize sum register to zero.
+	Comment("Initialize sum register to zero.")
 	s := GP64()
 	XORQ(s, s)
 
-	// Loop until zero bytes remain.
 	Label("loop")
+	Comment("Loop until zero bytes remain.")
 	CMPQ(n, Imm(0))
 	JE(LabelRef("done"))
 
-	// Load from pointer and add to running sum.
+	Comment("Load from pointer and add to running sum.")
 	ADDQ(Mem{Base: ptr}, s)
 
-	// Advance pointer, decrement byte count.
+	Comment("Advance pointer, decrement byte count.")
 	ADDQ(Imm(8), ptr)
 	DECQ(n)
 	JMP(LabelRef("loop"))
 
-	// Store sum to return value.
 	Label("done")
+	Comment("Store sum to return value.")
 	Store(s, ReturnIndex(0))
 	RET()
 	Generate()
@@ -137,18 +138,28 @@ The result from this code generator is:
 
 // func Sum(xs []uint64) uint64
 TEXT ·Sum(SB), NOSPLIT, $0-32
-	MOVQ	xs_base(FP), AX
-	MOVQ	xs_len+8(FP), CX
-	XORQ	DX, DX
+	MOVQ xs_base+0(FP), AX
+	MOVQ xs_len+8(FP), CX
+
+	// Initialize sum register to zero.
+	XORQ DX, DX
+
 loop:
-	CMPQ	CX, $0x00
-	JE	done
-	ADDQ	(AX), DX
-	ADDQ	$0x08, AX
-	DECQ	CX
-	JMP	loop
+	// Loop until zero bytes remain.
+	CMPQ CX, $0x00
+	JE   done
+
+	// Load from pointer and add to running sum.
+	ADDQ (AX), DX
+
+	// Advance pointer, decrement byte count.
+	ADDQ $0x08, AX
+	DECQ CX
+	JMP  loop
+
 done:
-	MOVQ	DX, ret+24(FP)
+	// Store sum to return value.
+	MOVQ DX, ret+24(FP)
 	RET
 ```
 
@@ -160,8 +171,10 @@ For demonstrations of `avo` features:
 
 * **[args](examples/args):** Loading function arguments.
 * **[returns](examples/returns):** Building return values.
-* **[data](examples/data):** Defining `DATA` sections.
 * **[complex](examples/complex):** Working with `complex{64,128}` types.
+* **[data](examples/data):** Defining `DATA` sections.
+* **[ext](examples/ext):** Interacting with types from external packages.
+* **[pragma](examples/pragma):** Apply compiler directives to generated functions.
 
 ### Real Examples
 

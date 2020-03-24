@@ -39,7 +39,7 @@ func (c *Context) Load(src gotypes.Component, dst reg.Register) reg.Register {
 		c.adderror(err)
 		return dst
 	}
-	c.mov(b.Addr, dst, int(gotypes.Sizes.Sizeof(b.Type)), int(dst.Bytes()), b.Type)
+	c.mov(b.Addr, dst, int(gotypes.Sizes.Sizeof(b.Type)), int(dst.Size()), b.Type)
 	return dst
 }
 
@@ -51,7 +51,14 @@ func (c *Context) Store(src reg.Register, dst gotypes.Component) {
 		c.adderror(err)
 		return
 	}
-	c.mov(src, b.Addr, int(src.Bytes()), int(gotypes.Sizes.Sizeof(b.Type)), b.Type)
+	c.mov(src, b.Addr, int(src.Size()), int(gotypes.Sizes.Sizeof(b.Type)), b.Type)
+}
+
+// Dereference loads a pointer and returns its element type.
+func (c *Context) Dereference(ptr gotypes.Component) gotypes.Component {
+	r := c.GP64()
+	c.Load(ptr, r)
+	return ptr.Dereference(r)
 }
 
 // ConstData builds a static data section containing just the given constant.

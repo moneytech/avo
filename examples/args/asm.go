@@ -2,9 +2,7 @@
 
 package main
 
-import (
-	. "github.com/mmcloughlin/avo/build"
-)
+import . "github.com/mmcloughlin/avo/build"
 
 func main() {
 	Package("github.com/mmcloughlin/avo/examples/args")
@@ -99,5 +97,11 @@ func main() {
 	Store(c128r, ReturnIndex(0))
 	RET()
 
+	TEXT("DereferenceFloat32", NOSPLIT, "func(s *Struct) float32")
+	s := Dereference(Param("s"))
+	f := Load(s.Field("Float32"), XMM())
+	Store(f, ReturnIndex(0))
+
+	RET()
 	Generate()
 }

@@ -74,12 +74,19 @@ func (l *Loader) Load() ([]inst.Instruction, error) {
 		im[e.Opcode] = e
 	}
 
+	// Merge aliased forms. This is primarily for MOVQ (issue #50).
+	for _, a := range aliases {
+		if existing, found := im[a.From]; found {
+			im[a.To].Forms = append(im[a.To].Forms, existing.Forms...)
+		}
+	}
+
 	// Apply list of aliases.
-	for from, to := range aliases {
-		cpy := *im[to]
-		cpy.Opcode = from
-		cpy.AliasOf = to
-		im[from] = &cpy
+	for _, a := range aliases {
+		cpy := *im[a.To]
+		cpy.Opcode = a.From
+		cpy.AliasOf = a.To
+		im[a.From] = &cpy
 	}
 
 	// Dedupe forms.
@@ -355,6 +362,7 @@ func (l Loader) form(opcode string, f opcodesxml.Form) inst.Form {
 		ISA:              isas,
 		Operands:         ops,
 		ImplicitOperands: implicits,
+		CancellingInputs: f.CancellingInputs,
 	}
 }
 

@@ -15,6 +15,9 @@ const dot = "\u00b7"
 type goasm struct {
 	cfg Config
 	prnt.Generator
+
+	instructions []*ir.Instruction
+	clear        bool
 }
 
 // NewGoAsm constructs a printer for writing Go assembly files.
@@ -61,6 +64,10 @@ func (p *goasm) function(f *ir.Function) {
 	p.NL()
 	p.Comment(f.Stub())
 
+	if len(f.ISA) > 0 {
+		p.Comment("Requires: " + strings.Join(f.ISA, ", "))
+	}
+
 	// Reference: https://github.com/golang/go/blob/b115207baf6c2decc3820ada4574ef4e5ad940ec/src/cmd/internal/obj/util.go#L166-L176
 	//
 	//		if p.As == ATEXT {
@@ -81,19 +88,66 @@ func (p *goasm) function(f *ir.Function) {
 	}
 	p.Printf(", %s\n", textsize(f))
 
+	p.clear = true
 	for _, node := range f.Nodes {
 		switch n := node.(type) {
 		case *ir.Instruction:
-			if len(n.Operands) > 0 {
-				p.Printf("\t%s\t%s\n", n.Opcode, joinOperands(n.Operands))
-			} else {
-				p.Printf("\t%s\n", n.Opcode)
+			p.instruction(n)
+			if n.IsTerminal || n.IsUnconditionalBranch() {
+				p.flush()
 			}
 		case ir.Label:
+			p.flush()
+			p.ensureclear()
 			p.Printf("%s:\n", n)
+		case *ir.Comment:
+			p.flush()
+			p.ensureclear()
+			for _, line := range n.Lines {
+				p.Printf("\t// %s\n", line)
+			}
 		default:
 			panic("unexpected node type")
 		}
+	}
+	p.flush()
+}
+
+func (p *goasm) instruction(i *ir.Instruction) {
+	p.instructions = append(p.instructions, i)
+	p.clear = false
+}
+
+func (p *goasm) flush() {
+	if len(p.instructions) == 0 {
+		return
+	}
+
+	// Determine instruction width. Instructions with no operands are not
+	// considered in this calculation.
+	width := 0
+	for _, i := range p.instructions {
+		if len(i.Operands) > 0 && len(i.Opcode) > width {
+			width = len(i.Opcode)
+		}
+	}
+
+	// Output instruction block.
+	for _, i := range p.instructions {
+		if len(i.Operands) > 0 {
+			p.Printf("\t%-*s%s\n", width+1, i.Opcode, joinOperands(i.Operands))
+		} else {
+			p.Printf("\t%s\n", i.Opcode)
+		}
+	}
+
+	p.instructions = nil
+}
+
+func (p *goasm) ensureclear() {
+	if !p.clear {
+		p.NL()
+		p.clear = true
 	}
 }
 

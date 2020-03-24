@@ -87,12 +87,10 @@ func (m Mem) Idx(r reg.Register, s uint8) Mem {
 // Asm returns an assembly syntax representation of m.
 func (m Mem) Asm() string {
 	a := m.Symbol.String()
-	if m.Disp != 0 {
-		if a == "" {
-			a += fmt.Sprintf("%d", m.Disp)
-		} else {
-			a += fmt.Sprintf("%+d", m.Disp)
-		}
+	if a != "" {
+		a += fmt.Sprintf("%+d", m.Disp)
+	} else if m.Disp != 0 {
+		a += fmt.Sprintf("%d", m.Disp)
 	}
 	if m.Base != nil {
 		a += fmt.Sprintf("(%s)", m.Base.Asm())
@@ -143,10 +141,10 @@ func Registers(op Op) []reg.Register {
 func ApplyAllocation(op Op, a reg.Allocation) Op {
 	switch op := op.(type) {
 	case reg.Register:
-		return a.LookupDefault(op)
+		return a.LookupRegisterDefault(op)
 	case Mem:
-		op.Base = a.LookupDefault(op.Base)
-		op.Index = a.LookupDefault(op.Index)
+		op.Base = a.LookupRegisterDefault(op.Base)
+		op.Index = a.LookupRegisterDefault(op.Index)
 		return op
 	}
 	return op

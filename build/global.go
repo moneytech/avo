@@ -70,7 +70,13 @@ func Constraint(t buildtags.ConstraintConvertable) { ctx.Constraint(t) }
 // constraint comments.
 func ConstraintExpr(expr string) { ctx.ConstraintExpr(expr) }
 
-// GP8 allocates and returns a general-purpose 8-bit register.
+// GP8L allocates and returns a general-purpose 8-bit register (low byte).
+func GP8L() reg.GPVirtual { return ctx.GP8L() }
+
+// GP8H allocates and returns a general-purpose 8-bit register (high byte).
+func GP8H() reg.GPVirtual { return ctx.GP8H() }
+
+// GP8 allocates and returns a general-purpose 8-bit register (low byte).
 func GP8() reg.GPVirtual { return ctx.GP8() }
 
 // GP16 allocates and returns a general-purpose 16-bit register.
@@ -112,11 +118,21 @@ func Load(src gotypes.Component, dst reg.Register) reg.Register { return ctx.Loa
 // attempt to select the right MOV instruction based on the types involved.
 func Store(src reg.Register, dst gotypes.Component) { ctx.Store(src, dst) }
 
+// Dereference loads a pointer and returns its element type.
+func Dereference(ptr gotypes.Component) gotypes.Component { return ctx.Dereference(ptr) }
+
 // Doc sets documentation comment lines for the currently active function.
 func Doc(lines ...string) { ctx.Doc(lines...) }
 
+// Pragma adds a compiler directive to the currently active function.
+func Pragma(directive string, args ...string) { ctx.Pragma(directive, args...) }
+
 // Attributes sets function attributes for the currently active function.
 func Attributes(a attr.Attribute) { ctx.Attributes(a) }
+
+// Implement starts building a function of the given name, whose type is
+// specified by a stub in the containing package.
+func Implement(name string) { ctx.Implement(name) }
 
 // AllocLocal allocates size bytes in the stack of the currently active function.
 // Returns a reference to the base pointer for the newly allocated region.
@@ -124,6 +140,12 @@ func AllocLocal(size int) operand.Mem { return ctx.AllocLocal(size) }
 
 // Label adds a label to the active function.
 func Label(name string) { ctx.Label(name) }
+
+// Comment adds comment lines to the active function.
+func Comment(lines ...string) { ctx.Comment(lines...) }
+
+// Commentf adds a formtted comment line.
+func Commentf(format string, a ...interface{}) { ctx.Commentf(format, a...) }
 
 // ConstData builds a static data section containing just the given constant.
 func ConstData(name string, v operand.Constant) operand.Mem { return ctx.ConstData(name, v) }

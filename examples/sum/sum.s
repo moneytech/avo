@@ -4,16 +4,26 @@
 
 // func Sum(xs []uint64) uint64
 TEXT ·Sum(SB), NOSPLIT, $0-32
-	MOVQ	xs_base(FP), AX
-	MOVQ	xs_len+8(FP), CX
-	XORQ	DX, DX
+	MOVQ xs_base+0(FP), AX
+	MOVQ xs_len+8(FP), CX
+
+	// Initialize sum register to zero.
+	XORQ DX, DX
+
 loop:
-	CMPQ	CX, $0x00
-	JE	done
-	ADDQ	(AX), DX
-	ADDQ	$0x08, AX
-	DECQ	CX
-	JMP	loop
+	// Loop until zero bytes remain.
+	CMPQ CX, $0x00
+	JE   done
+
+	// Load from pointer and add to running sum.
+	ADDQ (AX), DX
+
+	// Advance pointer, decrement byte count.
+	ADDQ $0x08, AX
+	DECQ CX
+	JMP  loop
+
 done:
-	MOVQ	DX, ret+24(FP)
+	// Store sum to return value.
+	MOVQ DX, ret+24(FP)
 	RET

@@ -27,6 +27,7 @@ func (c *ctors) Generate(is []inst.Instruction) ([]byte, error) {
 	c.Printf("package x86\n\n")
 	c.Printf("import (\n")
 	c.Printf("\t\"errors\"\n")
+	c.NL()
 	c.Printf("\tintrep \"%s/ir\"\n", pkg)
 	c.Printf("\t\"%s/reg\"\n", pkg)
 	c.Printf("\t\"%s/operand\"\n", pkg)
@@ -91,10 +92,24 @@ func construct(i inst.Instruction, f inst.Form, s signature) string {
 	fmt.Fprintf(buf, "\tInputs: %s,\n", operandsWithAction(f, inst.R, s))
 	fmt.Fprintf(buf, "\tOutputs: %s,\n", operandsWithAction(f, inst.W, s))
 
+	// ISAs.
+	if len(f.ISA) > 0 {
+		fmt.Fprintf(buf, "\tISA: %#v,\n", f.ISA)
+	}
+
 	// Branch variables.
+	if i.IsTerminal() {
+		fmt.Fprintf(buf, "\tIsTerminal: true,\n")
+	}
+
 	if i.IsBranch() {
 		fmt.Fprintf(buf, "\tIsBranch: true,\n")
 		fmt.Fprintf(buf, "\tIsConditional: %#v,\n", i.IsConditionalBranch())
+	}
+
+	// Cancelling inputs.
+	if f.CancellingInputs {
+		fmt.Fprintf(buf, "\tCancellingInputs: true,\n")
 	}
 
 	fmt.Fprintf(buf, "}")

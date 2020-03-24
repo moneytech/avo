@@ -10,9 +10,7 @@ The [code generator](asm.go) is as follows:
 
 package main
 
-import (
-	. "github.com/mmcloughlin/avo/build"
-)
+import . "github.com/mmcloughlin/avo/build"
 
 func main() {
 	TEXT("Add", NOSPLIT, "func(x, y uint64) uint64")
@@ -43,9 +41,9 @@ This produces [`add.s`](add.s) as follows:
 
 // func Add(x uint64, y uint64) uint64
 TEXT ·Add(SB), NOSPLIT, $0-24
-	MOVQ	x(FP), AX
-	MOVQ	y+8(FP), CX
-	ADDQ	AX, CX
-	MOVQ	CX, ret+16(FP)
+	MOVQ x+0(FP), AX
+	MOVQ y+8(FP), CX
+	ADDQ AX, CX
+	MOVQ CX, ret+16(FP)
 	RET
 ```

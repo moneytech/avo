@@ -4,6 +4,8 @@ package prnt
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"strings"
 )
 
 // Generator provides convenience methods for code generators. In particular it
@@ -13,6 +15,11 @@ import (
 type Generator struct {
 	buf bytes.Buffer
 	err error
+}
+
+// Raw provides direct access to the underlying output stream.
+func (g *Generator) Raw() io.Writer {
+	return &g.buf
 }
 
 // Printf prints to the internal buffer.
@@ -32,7 +39,8 @@ func (g *Generator) NL() {
 // Comment writes comment lines prefixed with "// ".
 func (g *Generator) Comment(lines ...string) {
 	for _, line := range lines {
-		g.Printf("// %s\n", line)
+		line = strings.TrimSpace("// " + line)
+		g.Printf("%s\n", line)
 	}
 }
 

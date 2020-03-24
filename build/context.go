@@ -2,7 +2,10 @@ package build
 
 import (
 	"errors"
+	"fmt"
 	"go/types"
+
+	"golang.org/x/tools/go/packages"
 
 	"github.com/mmcloughlin/avo/attr"
 	"github.com/mmcloughlin/avo/buildtags"
@@ -10,7 +13,6 @@ import (
 	"github.com/mmcloughlin/avo/ir"
 	"github.com/mmcloughlin/avo/operand"
 	"github.com/mmcloughlin/avo/reg"
-	"golang.org/x/tools/go/packages"
 )
 
 // Context maintains state for incrementally building an avo File.
@@ -34,7 +36,7 @@ func NewContext() *Context {
 // Package sets the package the generated file will belong to. Required to be able to reference types in the package.
 func (c *Context) Package(path string) {
 	cfg := &packages.Config{
-		Mode: packages.LoadTypes,
+		Mode: packages.NeedTypes | packages.NeedDeps | packages.NeedImports,
 	}
 	pkgs, err := packages.Load(cfg, path)
 	if err != nil {
@@ -90,6 +92,11 @@ func (c *Context) Doc(lines ...string) {
 	c.activefunc().Doc = lines
 }
 
+// Pragma adds a compiler directive to the currently active function.
+func (c *Context) Pragma(directive string, args ...string) {
+	c.activefunc().AddPragma(directive, args...)
+}
+
 // Attributes sets function attributes for the currently active function.
 func (c *Context) Attributes(a attr.Attribute) {
 	c.activefunc().Attributes = a
@@ -107,6 +114,23 @@ func (c *Context) SignatureExpr(expr string) {
 		c.adderror(err)
 		return
 	}
+	c.Signature(s)
+}
+
+// Implement starts building a function of the given name, whose type is
+// specified by a stub in the containing package.
+func (c *Context) Implement(name string) {
+	pkg := c.types()
+	if pkg == nil {
+		c.adderrormessage("no package specified")
+		return
+	}
+	s, err := gotypes.LookupSignature(pkg, name)
+	if err != nil {
+		c.adderror(err)
+		return
+	}
+	c.Function(name)
 	c.Signature(s)
 }
 
@@ -131,6 +155,16 @@ func (c *Context) Instruction(i *ir.Instruction) {
 // Label adds a label to the active function.
 func (c *Context) Label(name string) {
 	c.activefunc().AddLabel(ir.Label(name))
+}
+
+// Comment adds comment lines to the active function.
+func (c *Context) Comment(lines ...string) {
+	c.activefunc().AddComment(lines...)
+}
+
+// Commentf adds a formtted comment line.
+func (c *Context) Commentf(format string, a ...interface{}) {
+	c.Comment(fmt.Sprintf(format, a...))
 }
 
 func (c *Context) activefunc() *ir.Function {

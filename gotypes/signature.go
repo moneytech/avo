@@ -3,9 +3,12 @@ package gotypes
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"go/token"
 	"go/types"
 	"strconv"
+
+	"github.com/mmcloughlin/avo/operand"
 )
 
 // Signature represents a Go function signature.
@@ -29,6 +32,20 @@ func NewSignature(pkg *types.Package, sig *types.Signature) *Signature {
 // NewSignatureVoid builds the void signature "func()".
 func NewSignatureVoid() *Signature {
 	return NewSignature(nil, types.NewSignature(nil, nil, nil, false))
+}
+
+// LookupSignature returns the signature of the named function in the provided package.
+func LookupSignature(pkg *types.Package, name string) (*Signature, error) {
+	scope := pkg.Scope()
+	obj := scope.Lookup(name)
+	if obj == nil {
+		return nil, fmt.Errorf("could not find function \"%s\"", name)
+	}
+	s, ok := obj.Type().(*types.Signature)
+	if !ok {
+		return nil, fmt.Errorf("object \"%s\" does not have signature type", name)
+	}
+	return NewSignature(pkg, s), nil
 }
 
 // ParseSignature builds a Signature by parsing a Go function type expression.
@@ -67,7 +84,12 @@ func (s *Signature) Bytes() int { return s.Params().Bytes() + s.Results().Bytes(
 // String writes Signature as a string. This does not include the "func" keyword.
 func (s *Signature) String() string {
 	var buf bytes.Buffer
-	types.WriteSignature(&buf, s.sig, types.RelativeTo(s.pkg))
+	types.WriteSignature(&buf, s.sig, func(pkg *types.Package) string {
+		if pkg == s.pkg {
+			return ""
+		}
+		return pkg.Name()
+	})
 	return buf.String()
 }
 
@@ -116,7 +138,8 @@ func newTuple(t *types.Tuple, offsets []int64, size int64, defaultprefix string)
 				name += strconv.Itoa(i)
 			}
 		}
-		c := NewComponent(name, v.Type(), int(offsets[i]))
+		addr := operand.NewParamAddr(name, int(offsets[i]))
+		c := NewComponent(v.Type(), addr)
 		tuple.components = append(tuple.components, c)
 		if v.Name() != "" {
 			tuple.byname[v.Name()] = c
